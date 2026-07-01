@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>요기사주 인터랙티브 데모</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1C1926;
+    --ink-2: #272332;
+    --ink-3: #322B45;
+    --gold: #C9A75C;
+    --gold-soft: #E4D3A6;
+    --seal: #9B3B3B;
+    --cream: #F7F5F1;
+    --text-dark: #201C29;
+    --text-muted: #6B6478;
+    --hairline: #DAD3C4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--ink);
+    font-family: 'Noto Sans KR', -apple-system, sans-serif;
+    padding: 56px 24px 80px;
+    min-height: 100vh;
+  }
+
+  .page-head { text-align: center; margin-bottom: 34px; }
+  .page-head .eyebrow {
+    font-size: 12px; letter-spacing: 3px; color: var(--seal); font-weight: 700;
+    background: rgba(155,59,59,0.14); display: inline-block; padding: 5px 14px; border-radius: 3px;
+  }
+  .page-head h1 {
+    font-family: 'Noto Serif KR', serif; font-weight: 700; font-size: 32px;
+    color: var(--cream); margin-top: 16px; letter-spacing: 1px;
+  }
+  .page-head p { font-size: 13.5px; color: #9089A6; margin-top: 8px; }
+
+  .controls {
+    display: flex; justify-content: center; gap: 10px; margin-top: 22px;
+  }
+  .ctrl-btn {
+    background: var(--ink-2); color: var(--gold-soft); border: 1px solid #3E3752;
+    border-radius: 20px; padding: 9px 18px; font-size: 12.5px; font-weight: 700;
+    font-family: 'Noto Sans KR', sans-serif; cursor: pointer; letter-spacing: 0.3px;
+    display: flex; align-items: center; gap: 6px; transition: background 0.15s;
+  }
+  .ctrl-btn:hover { background: #332C48; }
+  .ctrl-btn.on { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+  .ctrl-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+  .ctrl-btn.on .ctrl-dot { animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+  .stage { display: flex; flex-direction: column; align-items: center; }
+
+  .phone {
+    width: 300px; height: 634px; background: #0E0C14; border-radius: 42px; padding: 12px;
+    box-shadow: 0 0 0 1px #3A3450, 0 30px 60px rgba(0,0,0,0.45);
+    position: relative;
+  }
+  .screen-stack { width: 100%; height: 100%; border-radius: 32px; overflow: hidden; position: relative; background: var(--ink); }
+
+  .screen {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform 0.45s cubic-bezier(0.22,0.61,0.36,1);
+    opacity: 0; pointer-events: none;
+  }
+  .screen.active { transform: translateX(0); opacity: 1; pointer-events: auto; }
+  .screen.exit-left { transform: translateX(-100%); }
+  .screen.light { background: var(--cream); color: var(--text-dark); }
+  .screen.dark { background: var(--ink); color: var(--cream); }
+
+  .statusbar { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px 4px; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .statusbar .icons { display: flex; gap: 5px; align-items: center; }
+  .sig-dot { width: 3px; height: 8px; background: currentColor; border-radius: 1px; display: inline-block; }
+  .home-indicator { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 108px; height: 4px; border-radius: 3px; background: currentColor; opacity: 0.5; }
+
+  .content { flex: 1; padding: 14px 24px 24px; display: flex; flex-direction: column; overflow: hidden; }
+
+  .back-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; cursor: pointer; }
+  .back-row .arrow { font-size: 15px; }
+  .back-row .lbl { font-size: 11px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.5px; }
+  .dark .back-row .lbl { color: #9089A6; }
+
+  .brand-mark { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+  .brand-mark .glyph { width: 22px; height: 22px; border-radius: 50%; background: var(--ink-3); display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--gold); }
+  .brand-mark .name { font-family: 'Noto Serif KR', serif; font-weight: 700; font-size: 15px; letter-spacing: 1px; color: var(--text-dark); }
+
+  .reveal { opacity: 0; transform: translateY(10px); transition: opacity 0.5s ease, transform 0.5s ease; }
+  .reveal.show { opacity: 1; transform: translateY(0); }
+
+  /* Screen 1 */
+  .field-label { font-size: 11px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .field-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .field-box { flex: 1; border: 1px solid var(--hairline); background: #FFFFFF; border-radius: 8px; padding: 11px 10px; font-size: 13.5px; color: var(--text-dark); font-weight: 500; }
+  .field-box.active-field { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,167,92,0.18); }
+  .onboard-title { font-family: 'Noto Serif KR', serif; font-weight: 700; font-size: 20px; line-height: 1.4; margin-bottom: 8px; }
+  .onboard-sub { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 26px; }
+  .btn-primary, .btn-gold {
+    width: 100%; border: none; border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 700;
+    font-family: 'Noto Sans KR', sans-serif; letter-spacing: 0.5px; cursor: pointer; margin-top: auto;
+    transition: transform 0.12s ease;
+  }
+  .btn-primary { background: var(--ink); color: var(--gold-soft); }
+  .btn-gold { background: var(--gold); color: var(--ink); }
+  .btn-primary:active, .btn-gold:active, .btn-outline:active, .btn-dark-cta:active { transform: scale(0.97); }
+  .fine-print { text-align: center; font-size: 10.5px; color: var(--text-muted); margin-top: 12px; }
+
+  /* Screen 2 */
+  .diag-date { font-size: 11px; color: var(--gold-soft); letter-spacing: 1.5px; margin-bottom: 4px; font-weight: 700; }
+  .diag-title { font-family: 'Noto Serif KR', serif; font-size: 19px; font-weight: 700; margin-bottom: 14px; }
+  .radar-wrap { display: flex; justify-content: center; margin-bottom: 14px; }
+  .radar-fill { transform-origin: 100px 95px; opacity: 0; transform: scale(0.55); transition: opacity 0.6s ease 0.15s, transform 0.6s cubic-bezier(0.22,0.61,0.36,1) 0.15s; }
+  .radar-fill.show { opacity: 1; transform: scale(1); }
+  .radar-dot { opacity: 0; transition: opacity 0.3s ease; }
+  .radar-dot.show { opacity: 1; }
+  .deficit-pill {
+    align-self: center; background: rgba(155,59,59,0.22); color: #E8A8A8; font-size: 11.5px; font-weight: 700;
+    padding: 6px 16px; border-radius: 20px; margin-bottom: 14px; letter-spacing: 0.5px;
+  }
+  .diag-headline { font-family: 'Noto Serif KR', serif; font-size: 17px; font-weight: 700; text-align: center; line-height: 1.45; margin-bottom: 10px; }
+  .diag-body { font-size: 12px; color: #B8AFCC; text-align: center; line-height: 1.6; margin-bottom: auto; }
+
+  /* Screen 3 */
+  .menu-header-title { font-family: 'Noto Serif KR', serif; font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+  .menu-header-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
+  .menu-card {
+    display: flex; align-items: center; gap: 12px; background: #FFFFFF; border: 1px solid var(--hairline);
+    border-radius: 12px; padding: 12px; margin-bottom: 12px;
+    opacity: 0; transform: translateX(18px); transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .menu-card.show { opacity: 1; transform: translateX(0); }
+  .menu-swatch { width: 44px; height: 44px; border-radius: 10px; background: var(--seal); flex-shrink: 0; }
+  .menu-info { flex: 1; min-width: 0; }
+  .menu-name { font-size: 13.5px; font-weight: 700; color: var(--text-dark); }
+  .menu-shop { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .menu-price { font-size: 12.5px; color: var(--text-dark); font-weight: 700; margin-top: 4px; }
+  .menu-add {
+    border: 1px solid var(--ink); background: transparent; color: var(--ink); font-size: 11px; font-weight: 700;
+    border-radius: 8px; padding: 7px 12px; flex-shrink: 0; cursor: pointer; transition: background 0.15s, color 0.15s;
+  }
+  .menu-add.added { background: var(--ink); color: var(--gold-soft); }
+  .btn-dark-cta {
+    margin-top: auto; background: var(--ink); color: var(--gold-soft); border: none; border-radius: 10px;
+    padding: 14px; text-align: center; font-size: 13.5px; font-weight: 700; cursor: pointer; width: 100%;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  /* Screen 4 */
+  .check-badge {
+    width: 52px; height: 52px; border-radius: 50%; background: var(--gold); display: flex; align-items: center;
+    justify-content: center; color: var(--ink); font-size: 24px; font-weight: 700; margin: 6px auto 16px;
+    transform: scale(0); transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s;
+  }
+  .check-badge.show { transform: scale(1); }
+  .complete-title { font-family: 'Noto Serif KR', serif; font-size: 19px; font-weight: 700; text-align: center; margin-bottom: 20px; }
+  .order-summary { background: var(--ink-2); border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; }
+  .order-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 5px 0; color: #D9D2E8; }
+  .order-row.total { border-top: 1px solid #3E3752; margin-top: 6px; padding-top: 10px; font-weight: 700; color: var(--cream); }
+  .share-label { font-size: 11.5px; color: #9089A6; text-align: center; margin-bottom: 10px; }
+  .share-card { background: var(--ink-2); border: 1px solid #3E3752; border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 16px; }
+  .share-card .sc-tag { font-size: 10px; color: var(--gold); letter-spacing: 1px; font-weight: 700; }
+  .share-card .sc-headline { font-family: 'Noto Serif KR', serif; font-size: 13.5px; font-weight: 700; margin-top: 6px; color: var(--cream); }
+  .toast {
+    position: absolute; left: 50%; bottom: 90px; transform: translate(-50%, 10px); background: var(--gold);
+    color: var(--ink); font-size: 12px; font-weight: 700; padding: 9px 18px; border-radius: 20px;
+    opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease; pointer-events: none; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .progress { display: flex; justify-content: center; gap: 7px; margin-top: 22px; }
+  .progress .pd { width: 7px; height: 7px; border-radius: 50%; background: #423A57; transition: background 0.25s, width 0.25s; }
+  .progress .pd.cur { background: var(--gold); width: 20px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <span class="eyebrow">INTERACTIVE DEMO</span>
+  <h1>요기사주</h1>
+  <p>AI 명리 엔진 x 미식 추천 시스템 &middot; 클릭해서 직접 진행해보세요</p>
+  <div class="controls">
+    <button class="ctrl-btn" id="autoplayBtn" onclick="toggleAutoplay()"><span class="ctrl-dot"></span>자동 재생</button>
+    <button class="ctrl-btn" onclick="restartDemo()">처음부터 다시보기</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="phone">
+    <div class="screen-stack" id="stack">
+
+      <div class="screen light active" data-idx="0">
+        <div class="statusbar"><span>9:41</span><span class="icons"><span class="sig-dot"></span><span class="sig-dot"></span><span class="sig-dot"></span></span></div>
+        <div class="content">
+          <div class="brand-mark"><span class="glyph">&#9775;</span><span class="name">요기사주</span></div>
+          <div class="onboard-title">당신의 데이터를<br>등록하세요</div>
+          <div class="onboard-sub">정확한 진단을 위해 생년월일시가 필요합니다. 최초 1회만 입력하면 됩니다.</div>
+          <div class="field-label">생년월일</div>
+          <div class="field-row">
+            <div class="field-box active-field">1998</div>
+            <div class="field-box">04</div>
+            <div class="field-box">17</div>
+          </div>
+          <div class="field-label">태어난 시각</div>
+          <div class="field-row"><div class="field-box">오후 03:00</div></div>
+          <button class="btn-primary" onclick="goTo(1)">명식 진단 시작하기</button>
+          <div class="fine-print">요기요 계정으로 안전하게 연동됩니다</div>
+        </div>
+        <div class="home-indicator" style="color:#201C29"></div>
+      </div>
+
+      <div class="screen dark" data-idx="1">
+        <div class="statusbar"><span>9:41</span><span class="icons"><span class="sig-dot"></span><span class="sig-dot"></span><span class="sig-dot"></span></span></div>
+        <div class="content">
+          <div class="back-row" onclick="goTo(0)"><span class="arrow">&larr;</span><span class="lbl">뒤로</span></div>
+          <div class="diag-date">2026.07.01 &middot; 오늘의 명식</div>
+          <div class="diag-title">오행 균형 리포트</div>
+          <div class="radar-wrap">
+            <svg width="190" height="180" viewBox="0 0 200 190">
+              <polygon points="100,20 172,72 145,158 55,158 28,72" fill="none" stroke="#3E3752" stroke-width="1"/>
+              <polygon points="100,54 148,86 128,142 72,142 52,86" fill="none" stroke="#3E3752" stroke-width="1"/>
+              <line x1="100" y1="95" x2="100" y2="20" stroke="#3E3752" stroke-width="1"/>
+              <line x1="100" y1="95" x2="172" y2="72" stroke="#3E3752" stroke-width="1"/>
+              <line x1="100" y1="95" x2="145" y2="158" stroke="#3E3752" stroke-width="1"/>
+              <line x1="100" y1="95" x2="55" y2="158" stroke="#3E3752" stroke-width="1"/>
+              <line x1="100" y1="95" x2="28" y2="72" stroke="#3E3752" stroke-width="1"/>
+              <polygon class="radar-fill" points="100,38 156,78 124,148 72,140 46,80" fill="#C9A75C" fill-opacity="0.22" stroke="#C9A75C" stroke-width="1.5"/>
+              <circle class="radar-dot" cx="100" cy="38" r="3.5" fill="#E4D3A6"/>
+              <circle class="radar-dot" cx="156" cy="78" r="5" fill="#9B3B3B" stroke="#1C1926" stroke-width="1.5"/>
+              <circle class="radar-dot" cx="124" cy="148" r="3.5" fill="#E4D3A6"/>
+              <circle class="radar-dot" cx="72" cy="140" r="3.5" fill="#E4D3A6"/>
+              <circle class="radar-dot" cx="46" cy="80" r="3.5" fill="#E4D3A6"/>
+              <text x="100" y="12" text-anchor="middle" fill="#E4D3A6" font-size="11" font-weight="700">목</text>
+              <text x="182" y="70" text-anchor="middle" fill="#E8A8A8" font-size="11" font-weight="700">화</text>
+              <text x="150" y="176" text-anchor="middle" fill="#E4D3A6" font-size="11" font-weight="700">토</text>
+              <text x="50" y="176" text-anchor="middle" fill="#E4D3A6" font-size="11" font-weight="700">금</text>
+              <text x="16" y="70" text-anchor="middle" fill="#E4D3A6" font-size="11" font-weight="700">수</text>
+            </svg>
+          </div>
+          <div style="text-align:center" class="reveal" id="pillWrap"><span class="deficit-pill">화(火) 기운 결핍</span></div>
+          <div class="diag-headline reveal" id="diagHeadline">오늘은 뜨겁고 매콤한<br>기운이 필요해요</div>
+          <div class="diag-body reveal" id="diagBody">명리 엔진이 오늘 날짜의 오행 데이터를 분석한 결과입니다. 화 기운을 보완하는 메뉴를 처방해드릴게요.</div>
+          <button class="btn-gold" onclick="goTo(2)">처방 메뉴 보기</button>
+        </div>
+        <div class="home-indicator" style="color:#F7F5F1"></div>
+      </div>
+
+      <div class="screen light" data-idx="2">
+        <div class="statusbar"><span>9:41</span><span class="icons"><span class="sig-dot"></span><span class="sig-dot"></span><span class="sig-dot"></span></span></div>
+        <div class="content">
+          <div class="back-row" onclick="goTo(1)"><span class="arrow">&larr;</span><span class="lbl">뒤로</span></div>
+          <div class="menu-header-title">화(火) 처방 메뉴</div>
+          <div class="menu-header-sub">쌉쌀하고 매콤한 붉은 음식 3선</div>
+
+          <div class="menu-card" data-menu="0">
+            <div class="menu-swatch"></div>
+            <div class="menu-info"><div class="menu-name">얼큰 마라탕</div><div class="menu-shop">홍마라탕 강남점 &middot; 25분</div><div class="menu-price">12,900원</div></div>
+            <button class="menu-add" onclick="toggleAdd(this)">담기</button>
+          </div>
+          <div class="menu-card" data-menu="1">
+            <div class="menu-swatch"></div>
+            <div class="menu-info"><div class="menu-name">토마토 크림 파스타</div><div class="menu-shop">파스타공방 &middot; 30분</div><div class="menu-price">14,500원</div></div>
+            <button class="menu-add" onclick="toggleAdd(this)">담기</button>
+          </div>
+          <div class="menu-card" data-menu="2">
+            <div class="menu-swatch"></div>
+            <div class="menu-info"><div class="menu-name">매콤 떡볶이 세트</div><div class="menu-shop">죠스떡볶이 &middot; 20분</div><div class="menu-price">9,900원</div></div>
+            <button class="menu-add" onclick="toggleAdd(this)">담기</button>
+          </div>
+
+          <button class="btn-dark-cta" onclick="goTo(3)">3개 메뉴 담고 주문하기</button>
+        </div>
+        <div class="home-indicator" style="color:#201C29"></div>
+      </div>
+
+      <div class="screen dark" data-idx="3">
+        <div class="statusbar"><span>9:41</span><span class="icons"><span class="sig-dot"></span><span class="sig-dot"></span><span class="sig-dot"></span></span></div>
+        <div class="content">
+          <div class="back-row" onclick="goTo(2)"><span class="arrow">&larr;</span><span class="lbl">뒤로</span></div>
+          <div class="check-badge" id="checkBadge">&#10003;</div>
+          <div class="complete-title">처방이 완료되었습니다</div>
+          <div class="order-summary">
+            <div class="order-row"><span>얼큰 마라탕 외 2건</span><span>3개</span></div>
+            <div class="order-row"><span>예상 도착</span><span>32분</span></div>
+            <div class="order-row total"><span>결제 금액</span><span id="orderTotal">0원</span></div>
+          </div>
+          <div class="share-label">오늘의 명식을 공유해보세요</div>
+          <div class="share-card">
+            <div class="sc-tag">TODAY'S DIAGNOSIS</div>
+            <div class="sc-headline">"오늘은 화(火) 기운이<br>부족합니다" &mdash; 요기사주</div>
+          </div>
+          <button class="btn-gold" onclick="showToast()">리포트 공유하기</button>
+        </div>
+        <div class="toast" id="toast">공유 링크가 복사되었습니다</div>
+        <div class="home-indicator" style="color:#F7F5F1"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="progress" id="progress">
+    <div class="pd cur" data-p="0"></div><div class="pd" data-p="1"></div><div class="pd" data-p="2"></div><div class="pd" data-p="3"></div>
+  </div>
+</div>
+
+<script>
+  var current = 0;
+  var autoplay = false;
+  var autoTimer = null;
+  var screens = document.querySelectorAll('.screen');
+  var dots = document.querySelectorAll('.progress .pd');
+
+  function goTo(idx) {
+    if (idx === current) return;
+    screens.forEach(function (s) {
+      var i = parseInt(s.getAttribute('data-idx'));
+      s.classList.remove('active');
+      if (i < idx) {
+        s.classList.add('exit-left');
+      } else if (i > idx) {
+        s.classList.remove('exit-left');
+      } else {
+        s.classList.remove('exit-left');
+        s.classList.add('active');
+      }
+    });
+    current = idx;
+    dots.forEach(function (d) { d.classList.toggle('cur', parseInt(d.getAttribute('data-p')) === idx); });
+    runScreenEffects(idx);
+  }
+
+  function runScreenEffects(idx) {
+    if (idx === 1) {
+      var fill = document.querySelector('.radar-fill');
+      var radarDots = document.querySelectorAll('.radar-dot');
+      var pill = document.getElementById('pillWrap');
+      var headline = document.getElementById('diagHeadline');
+      var body = document.getElementById('diagBody');
+      [fill, pill, headline, body].forEach(function (el) { if (el) el.classList.remove('show'); });
+      radarDots.forEach(function (d) { d.classList.remove('show'); });
+      setTimeout(function () { if (fill) fill.classList.add('show'); }, 80);
+      radarDots.forEach(function (d, i) { setTimeout(function () { d.classList.add('show'); }, 200 + i * 90); });
+      setTimeout(function () { pill.classList.add('show'); }, 650);
+      setTimeout(function () { headline.classList.add('show'); }, 800);
+      setTimeout(function () { body.classList.add('show'); }, 950);
+    }
+    if (idx === 2) {
+      var cards = document.querySelectorAll('.menu-card');
+      cards.forEach(function (c) { c.classList.remove('show'); });
+      cards.forEach(function (c, i) { setTimeout(function () { c.classList.add('show'); }, 120 + i * 130); });
+    }
+    if (idx === 3) {
+      var badge = document.getElementById('checkBadge');
+      badge.classList.remove('show');
+      setTimeout(function () { badge.classList.add('show'); }, 80);
+      animateTotal(37300, 700);
+    }
+  }
+
+  function animateTotal(target, duration) {
+    var el = document.getElementById('orderTotal');
+    var start = performance.now();
+    function step(now) {
+      var p = Math.min(1, (now - start) / duration);
+      var eased = 1 - Math.pow(1 - p, 3);
+      var val = Math.round(target * eased);
+      el.textContent = val.toLocaleString('ko-KR') + '원';
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function toggleAdd(btn) {
+    btn.classList.toggle('added');
+    btn.textContent = btn.classList.contains('added') ? '담김' : '담기';
+  }
+
+  function showToast() {
+    var t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 1800);
+  }
+
+  function restartDemo() {
+    stopAutoplay();
+    document.querySelectorAll('.menu-add').forEach(function (b) { b.classList.remove('added'); b.textContent = '담기'; });
+    goTo(0);
+  }
+
+  function toggleAutoplay() {
+    if (autoplay) { stopAutoplay(); } else { startAutoplay(); }
+  }
+
+  function startAutoplay() {
+    autoplay = true;
+    document.getElementById('autoplayBtn').classList.add('on');
+    scheduleNext();
+  }
+
+  function stopAutoplay() {
+    autoplay = false;
+    document.getElementById('autoplayBtn').classList.remove('on');
+    if (autoTimer) clearTimeout(autoTimer);
+  }
+
+  function scheduleNext() {
+    var waits = [2600, 3600, 3200, 4200];
+    autoTimer = setTimeout(function () {
+      if (!autoplay) return;
+      var next = (current + 1) % 4;
+      if (next === 0) {
+        document.querySelectorAll('.menu-add').forEach(function (b) { b.classList.remove('added'); b.textContent = '담기'; });
+      }
+      goTo(next);
+      scheduleNext();
+    }, waits[current]);
+  }
+
+  runScreenEffects(0);
+</script>
+
+</body>
+</html>
